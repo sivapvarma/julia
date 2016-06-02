@@ -124,4 +124,7 @@
 #  endif
 #endif
 
+// Automatic Instrumenting Profiler
+//#define ENABLE_TIMINGS
+
 #endif

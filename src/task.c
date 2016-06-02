@@ -244,6 +244,7 @@ static void NOINLINE JL_NORETURN start_task(void)
                 jl_get_ptls_states()->defer_signal = 0;
                 jl_sigint_safepoint();
             }
+            JL_TIMING(ROOT);
             res = jl_apply(&t->start, 1);
         }
         JL_CATCH {
@@ -285,6 +286,11 @@ static void ctx_switch(jl_tls_states_t *ptls, jl_task_t *t, jl_jmp_buf *where)
 {
     if (t == ptls->current_task)
         return;
+#ifdef ENABLE_TIMINGS
+    jl_timing_block_t *blk = ptls->current_task->timing_stack;
+    if (blk)
+        jl_timing_block_stop(blk);
+#endif
     if (!jl_setjmp(ptls->current_task->ctx, 0)) {
         // backtraces don't survive task switches, see e.g. issue #12485
         ptls->bt_size = 0;
@@ -361,6 +367,11 @@ static void ctx_switch(jl_tls_states_t *ptls, jl_task_t *t, jl_jmp_buf *where)
         jl_longjmp(*where, 1);
 #endif
     }
+#ifdef ENABLE_TIMINGS
+    assert(blk == jl_current_task->timing_stack);
+    if (blk)
+        jl_timing_block_start(blk);
+#endif
 }
 
 JL_DLLEXPORT jl_value_t *jl_switchto(jl_task_t *t, jl_value_t *arg)
@@ -492,6 +503,8 @@ static void init_task(jl_task_t *t, char *stack)
 
 #endif /* !COPY_STACKS */
 
+jl_timing_block_t *jl_pop_timing_block(jl_timing_block_t *cur_block);
+
 // yield to exception handler
 void JL_NORETURN throw_internal(jl_value_t *e)
 {
@@ -502,8 +515,16 @@ void JL_NORETURN throw_internal(jl_value_t *e)
     jl_gc_unsafe_enter(ptls);
     assert(e != NULL);
     ptls->exception_in_transit = e;
-    if (ptls->current_task->eh != NULL) {
-        jl_longjmp(ptls->current_task->eh->eh_ctx, 1);
+    jl_handler_t *eh = ptls->current_task->eh;
+    if (eh != NULL) {
+#ifdef ENABLE_TIMINGS
+        jl_timing_block_t *cur_block = ptls->current_task->timing_stack;
+        while (cur_block && eh->timing_stack != cur_block) {
+            cur_block = jl_pop_timing_block(cur_block);
+        }
+        assert(cur_block == eh->timing_stack);
+#endif
+        jl_longjmp(eh->eh_ctx, 1);
     }
     else {
         jl_printf(JL_STDERR, "fatal: error thrown and no exception handler available.\n");
@@ -561,6 +582,9 @@ JL_DLLEXPORT jl_task_t *jl_new_task(jl_function_t *start, size_t ssize)
     t->stkbuf = NULL;
     t->tid = 0;
     t->started = 0;
+#ifdef ENABLE_TIMINGS
+    t->timing_stack = NULL;
+#endif
 
 #ifdef COPY_STACKS
     t->bufsz = 0;

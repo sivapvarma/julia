@@ -208,6 +208,7 @@ jl_lambda_info_t *jl_get_unspecialized(jl_lambda_info_t *method)
 */
 jl_lambda_info_t *jl_type_infer(jl_lambda_info_t *li, int force)
 {
+    JL_TIMING(INFERENCE);
 #ifdef ENABLE_INFERENCE
     jl_module_t *mod = NULL;
     if (li->def != NULL)
@@ -1239,6 +1240,7 @@ jl_lambda_info_t *jl_compile_for_dispatch(jl_lambda_info_t *li)
 // compile-time method lookup
 jl_lambda_info_t *jl_get_specialization1(jl_tupletype_t *types)
 {
+    JL_TIMING(METHOD_LOOKUP_COMPILE);
     assert(jl_nparams(types) > 0);
     if (!jl_is_leaf_type((jl_value_t*)types) || jl_has_typevars((jl_value_t*)types))
         return NULL;
@@ -1889,6 +1891,7 @@ JL_DLLEXPORT jl_value_t *jl_apply_generic(jl_value_t **args, uint32_t nargs)
     }
     // if no method was found in the associative cache, check the full cache
     if (i == 4) {
+        JL_TIMING(METHOD_LOOKUP_FAST);
         jl_value_t *F = args[0];
         mt = jl_gf_mtable(F);
         entry = jl_typemap_assoc_exact(mt->cache, args, nargs, jl_cachearg_offset(mt));
@@ -1902,13 +1905,13 @@ JL_DLLEXPORT jl_value_t *jl_apply_generic(jl_value_t **args, uint32_t nargs)
     jl_lambda_info_t *mfunc = NULL;
     jl_tupletype_t *tt = NULL;
     if (entry == NULL) {
+        JL_TIMING(METHOD_LOOKUP_SLOW);
         // cache miss case
         tt = arg_type_tuple(args, nargs);
         // if running inference overwrites this particular method, it becomes
         // unreachable from the method table, so root mfunc.
         JL_GC_PUSH2(&tt, &mfunc);
         mfunc = jl_mt_assoc_by_type(mt, tt, 1, 0);
-
         if (mfunc == NULL) {
 #ifdef JL_TRACE
             if (error_en)

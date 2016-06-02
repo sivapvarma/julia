@@ -906,7 +906,7 @@ static void jl_serialize_value_(ios_t *s, jl_value_t *v)
         write_int8(s, li->isva);
         write_int32(s, li->nargs);
         jl_serialize_value(s, (jl_value_t*)li->def);
-        jl_serialize_fptr(s, li->fptr);
+        jl_serialize_fptr(s, (void*)(uintptr_t)li->fptr);
         // save functionObject pointers
         write_int32(s, li->functionID);
         write_int32(s, li->specFunctionID);
@@ -1923,6 +1923,7 @@ static void jl_save_system_image_to_stream(ios_t *f)
 {
     jl_gc_collect(1); // full
     jl_gc_collect(0); // incremental (sweep finalizers)
+    JL_TIMING(SYSIMG_DUMP);
     JL_LOCK(&dump_lock); // Might GC
     int en = jl_gc_enable(0);
     htable_reset(&backref_table, 250000);
@@ -2020,6 +2021,7 @@ JL_DLLEXPORT void jl_preload_sysimg_so(const char *fname)
 
 static void jl_restore_system_image_from_stream(ios_t *f)
 {
+    JL_TIMING(SYSIMG_LOAD);
     JL_LOCK(&dump_lock); // Might GC
     int en = jl_gc_enable(0);
     DUMP_MODES last_mode = mode;
@@ -2117,6 +2119,7 @@ JL_DLLEXPORT void jl_restore_system_image_data(const char *buf, size_t len)
 
 JL_DLLEXPORT jl_array_t *jl_compress_ast(jl_lambda_info_t *li, jl_array_t *ast)
 {
+    JL_TIMING(AST_COMPRESS);
     JL_LOCK(&dump_lock); // Might GC
     assert(jl_is_lambda_info(li));
     assert(jl_is_array(ast));
@@ -2154,6 +2157,7 @@ JL_DLLEXPORT jl_array_t *jl_compress_ast(jl_lambda_info_t *li, jl_array_t *ast)
 
 JL_DLLEXPORT jl_array_t *jl_uncompress_ast(jl_lambda_info_t *li, jl_array_t *data)
 {
+    JL_TIMING(AST_UNCOMPRESS);
     JL_LOCK(&dump_lock); // Might GC
     assert(jl_is_lambda_info(li));
     assert(jl_is_array(data));

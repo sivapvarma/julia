@@ -1415,6 +1415,7 @@ JL_DLLEXPORT void jl_sigatomic_end(void);
 
 // tasks and exceptions -------------------------------------------------------
 
+typedef struct _jl_timing_block_t jl_timing_block_t;
 // info describing an exception handler
 typedef struct _jl_handler_t {
     jl_jmp_buf eh_ctx;
@@ -1426,6 +1427,7 @@ typedef struct _jl_handler_t {
 #endif
     sig_atomic_t defer_signal;
     int finalizers_inhibited;
+    jl_timing_block_t *timing_stack;
 } jl_handler_t;
 
 typedef struct _jl_task_t {
@@ -1460,6 +1462,7 @@ typedef struct _jl_task_t {
     // This is statically initialized when the task is not holding any locks
     arraylist_t locks;
 #endif
+    jl_timing_block_t *timing_stack;
 } jl_task_t;
 
 #define jl_current_task (jl_get_ptls_states()->current_task)
