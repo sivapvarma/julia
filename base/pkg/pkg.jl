@@ -203,8 +203,12 @@ pin(pkg::AbstractString, ver::VersionNumber) = cd(Entry.pin,pkg,ver)
 Update the metadata repo – kept in `Pkg.dir("METADATA")` – then update any fixed packages
 that can safely be pulled from their origin; then call `Pkg.resolve()` to determine a new
 optimal set of packages versions.
+
+    update(pkgs...)
+
+Same as update(), but only updates the packages explicitly provided and their dependencies.
 """
-update() = cd(Entry.update,Dir.getmetabranch())
+update(upkgs::AbstractString...) = cd(Entry.update,Dir.getmetabranch(),Set{String}([upkgs...]))
 
 """
     resolve()
