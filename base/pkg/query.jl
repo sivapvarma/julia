@@ -90,6 +90,39 @@ function partial_update_mask(instd::Dict{String,Tuple{VersionNumber,Bool}}, avai
     return dont_update
 end
 
+# Try to produce some helpful message in case of a partial update which does not go all the way
+# (Does not do a full analysis, it only checks requirements and direct dependents.)
+function check_partial_updates(reqs::Requires, deps::Dict{String,Dict{VersionNumber,Available}}, want::Dict{String,VersionNumber}, upkgs::Set{String})
+    for p in upkgs
+        p in keys(want) || (warn("Something went wrong with the update of package $p, please submit a bug report"); continue)
+        v = want[p]
+        p in keys(deps) || continue
+        vers = sort!(collect(keys(deps[p])))
+        higher_vers = vers[vers .> v]
+        isempty(higher_vers) && continue
+        blocking_parents = Set{String}()
+        for (p1,d1) in deps
+            p1 in upkgs && continue
+            haskey(want, p1) || continue
+            v1 = want[p1]
+            haskey(d1, v1) || continue
+            r1 = d1[v1].requires
+            p in keys(r1) || continue
+            vs1 = r1[p]
+            any(hv in vs1 for hv in higher_vers) && continue
+            push!(blocking_parents, p1)
+        end
+        blocking_reqs = (haskey(reqs, p) && all(hv ∉ reqs[p] for hv in higher_vers))
+        msg = "Package $p was set to version $v, but a higher version $(vers[end]) exists."
+        if blocking_reqs
+            msg *= "\n      The update is prevented by explicit requirements constraints. Edit your REQUIRE file to change this."
+        elseif !isempty(blocking_parents)
+            msg *= string("\n      To update to the lastest version, you could try updating these packages as well: ", join(blocking_parents, ", ", " and "), ".")
+        end
+        info(msg)
+    end
+end
+
 typealias PackageState Union{Void,VersionNumber}
 
 function diff(have::Dict, want::Dict, avail::Dict, fixed::Dict)

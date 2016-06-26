@@ -425,7 +425,7 @@ function update(branch::AbstractString, upkgs::Set{String})
         end
     end
     info("Computing changes...")
-    resolve(reqs, avail, instd, fixed, free)
+    resolve(reqs, avail, instd, fixed, free, upkgs)
     # Don't use instd here since it may have changed
     updatehook(sort!(collect(keys(installed()))))
 
@@ -441,7 +441,9 @@ function resolve(
     instd :: Dict = Read.installed(avail),
     fixed :: Dict = Read.fixed(avail,instd),
     have  :: Dict = Read.free(instd),
+    upkgs :: Set{String} = Set{String}()
 )
+    orig_reqs = reqs
     reqs = Query.requirements(reqs,fixed,avail)
     deps, conflicts = Query.dependencies(avail,fixed)
 
@@ -459,8 +461,11 @@ function resolve(
 
     Query.check_requirements(reqs,deps,fixed)
 
+    orig_deps = deps
     deps = Query.prune_dependencies(reqs,deps)
     want = Resolve.resolve(reqs,deps)
+
+    Query.check_partial_updates(orig_reqs,orig_deps,want,upkgs)
 
     # compare what is installed with what should be
     changes = Query.diff(have, want, avail, fixed)
