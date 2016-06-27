@@ -82,7 +82,7 @@ CartesianRange{N}(rngs::NTuple{N,Union{Int,AbstractUnitRange{Int}}}) = Cartesian
 ndims(R::CartesianRange) = length(R.start)
 ndims{I<:CartesianIndex}(::Type{CartesianRange{I}}) = length(I)
 
-eachindex(::LinearSlow, A::AbstractArray) = CartesianRange(size(A))
+eachindex(::LinearSlow, A::AbstractArray) = CartesianRange(indices(A))
 
 @inline eachindex(::LinearSlow, A::AbstractArray, B::AbstractArray...) = CartesianRange(maxsize((), A, B...))
 maxsize(sz) = sz
