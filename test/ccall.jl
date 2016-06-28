@@ -2,6 +2,7 @@
 
 import Base.copy, Base.==
 
+@testset "ccall" begin
 const libccalltest = "libccalltest"
 
 const verbose = false
@@ -847,5 +848,7 @@ elseif Sys.ARCH === :powerpc64le
 
 else
 warn("ccall: no VecReg tests run for this platform")
+
+end
 
 end
