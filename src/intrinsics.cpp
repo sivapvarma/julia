@@ -1144,6 +1144,9 @@ static jl_cgval_t emit_intrinsic(intrinsic f, jl_value_t **args, size_t nargs,
             r = builder.CreateXor(x, ConstantInt::get(T_int8, 1, true));
         else
             r = emit_untyped_intrinsic(f, x, y, z, nargs, ctx, (jl_datatype_t**)&newtyp);
+        // TODO: some of these intrinsics return constant values, so
+        //       emit_untyped_intrinsic should return jl_cgval_t's
+        //       (resulting in known-constant values)
         if (!newtyp && r->getType() != x->getType())
             // cast back to the exact original type (e.g. float vs. int) before remarking as a julia type
             r = builder.CreateBitCast(r, x->getType());
