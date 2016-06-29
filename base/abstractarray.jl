@@ -39,7 +39,10 @@ end
 
 Returns the tuple of valid indices for array `A`.
 """
-indices{T,N}(A::AbstractArray{T,N}) = _indices((), A) # faster than ntuple(d->indices(A,d), Val{N})
+function indices{T,N}(A::AbstractArray{T,N})
+    @_inline_meta
+    _indices((), A)
+end
 _indices{T,N}(out::NTuple{N}, A::AbstractArray{T,N}) = out
 function _indices(out, A::AbstractArray)
     @_inline_meta
