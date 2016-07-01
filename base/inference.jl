@@ -1426,24 +1426,35 @@ function typeinf_edge(method::Method, atypes::ANY, sparams::SimpleVector, needtr
     elseif cached
         # check cached specializations
         # for an existing result stored there
-        if !is(method.specializations, nothing)
+        if method.specializations !== nothing
             code = ccall(:jl_specializations_lookup, Any, (Any, Any), method, atypes)
-            if isa(code, Void)
-                # something completely new
-            elseif isa(code, LambdaInfo)
-                # something existing
-                if code.inferred && !(needtree && code.code === nothing)
+        end
+        if code === nothing && !needtree && !isleaftype(atypes)
+            retty = ccall(:jl_tfunc_lookup, Any, (Any, Any), method, atypes)
+            if isa(retty, Type)
+                return (nothing, retty, true)
+            elseif isa(retty, LambdaInfo)
+                code = retty
+                if code.inferred
                     return (code, code.rettype, true)
                 end
-            else
-                # sometimes just a return type is stored here. if a full AST
-                # is not needed, we can return it.
-                typeassert(code, Type)
-                if !needtree
-                    return (nothing, code, true)
-                end
-                code = nothing
             end
+        end
+        if code === nothing
+            # something completely new
+        elseif isa(code, LambdaInfo)
+            # something existing
+            if code.inferred && !(needtree && code.code === nothing)
+                return (code, code.rettype, true)
+            end
+        else
+            # sometimes just a return type is stored here. if a full AST
+            # is not needed, we can return it.
+            typeassert(code, Type)
+            if !needtree
+                return (nothing, code, true)
+            end
+            code = nothing
         end
     end
 
@@ -1494,6 +1505,8 @@ function typeinf_edge(method::Method, atypes::ANY, sparams::SimpleVector, needtr
         catch
             return (nothing, Any, false)
         end
+    elseif !needtree && !isleaftype(atypes)
+        linfo = ccall(:jl_tfunc_get_linfo, Ref{LambdaInfo}, (Any, Any, Any), method, atypes, sparams)
     else
         linfo = specialize_method(method, atypes, sparams, cached)
     end
@@ -1982,18 +1995,21 @@ function finish(me::InferenceState)
             me.linfo.specTypes, me.linfo.def.sig, me.linfo.def) != 0
     end
 
+    ccall(:jl_set_lambda_rettype, Void, (Any, Any), me.linfo, widenconst(me.bestguess))
+
     if me.needtree
         if isdefined(me.linfo, :def)
             # compress code for non-toplevel thunks
             compressedtree = ccall(:jl_compress_ast, Any, (Any,Any), me.linfo, me.linfo.code)
             me.linfo.code = compressedtree
         end
+    elseif !isleaftype(me.linfo.specTypes)
+        ccall(:jl_tfunc_clear_linfo, Void, (Any, Any), me.linfo.def, me.linfo.specTypes)
     else
         ccall(:jl_set_lambda_code_null, Void, (Any,), me.linfo)
         me.linfo.inlineable = false
     end
 
-    ccall(:jl_set_lambda_rettype, Void, (Any, Any), me.linfo, widenconst(me.bestguess))
     me.linfo.inferred = true
     me.linfo.inInference = false
     # finalize and record the linfo result
