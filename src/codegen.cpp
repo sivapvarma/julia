@@ -2519,7 +2519,10 @@ static bool emit_builtin_call(jl_cgval_t *ret, jl_value_t *f, jl_value_t **args,
             if (jl_is_leaf_type(tp0)) {
                 emit_expr(args[1], ctx);
                 assert(jl_is_datatype(tp0));
-                *ret = mark_julia_const(jl_box_long(jl_datatype_nfields(tp0)));
+                jl_value_t *c = jl_box_long(jl_datatype_nfields(tp0));
+                if (ctx->linfo->def) // toplevel exprs are already rooted
+                    jl_add_linfo_root(ctx->linfo, c);
+                *ret = mark_julia_const(c);
                 JL_GC_POP();
                 return true;
             }
@@ -2577,7 +2580,10 @@ static bool emit_builtin_call(jl_cgval_t *ret, jl_value_t *f, jl_value_t **args,
             sty != jl_datatype_type) {
             if (jl_is_leaf_type((jl_value_t*)sty) ||
                 (sty->name->names == jl_emptysvec && sty->size > 0)) {
-                *ret = mark_julia_const(jl_box_long(sty->size));
+                jl_value_t *c = jl_box_long(sty->size);
+                if (ctx->linfo->def) // toplevel exprs are already rooted
+                    jl_add_linfo_root(ctx->linfo, c);
+                *ret = mark_julia_const(c);
                 JL_GC_POP();
                 return true;
             }
