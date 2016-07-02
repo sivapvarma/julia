@@ -1,6 +1,5 @@
 # This file is a part of Julia. License is MIT: http://julialang.org/license
 
-@testset "dense" begin
 debug = false
 
 # Check that non-floats are correctly promoted
@@ -513,4 +512,3 @@ a = rand(10)
 b = view(a,2:2:10)
 @test Base.LinAlg.stride1(b) == 2
 
-end
